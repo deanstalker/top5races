@@ -1,0 +1,199 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+    <section id="app" class="mui-container">
+            <div class="main mui-appbar">
+                <table width="100%">
+                    <tr style="vertical-align:middle;">
+                        <td class="mui--appbar-height">
+                            <div class="mui--text-headline" style="padding: 0 1em;">${title}</div>
+                        </td>
+                        <td class="mui--appbar-height" align="right"></td>
+                    </tr>
+                </table>
+            </div>
+            <div class="mui-row">&nbsp;</div>
+        <next5-widget></next5-widget>
+    </section>
+
+    <template id="next5-widget">
+        <transition name="fade">
+        <div class="mui-container-fluid" v-if="races">
+        <div class="mui-row">
+            <div is="race-tile" class="race-tile" v-for="race in races" :race="race" class="race-tile"></div>
+        </div>
+        </div>
+        </transition>
+    </template>
+
+    <template id="race-tile">
+        <div class="mui-col-md-3">
+        <div class="mui-panel" v-on:click="gotoRace(race)" v-bind:title="race.race.description">
+            <div class="mui-appbar" v-bind:class="[race.meeting.type]">
+                <div>${race.meeting.type | translateType}</div>
+            </div>
+            <div class="mui-row">
+                <div class="mui-col-md-8 mui--text-headline" style="padding-left: 1em;">${race.meeting.name}</div>
+                <div class="mui-col-md-4 mui--text-display1">
+                    ${race.race.raceNumber}
+                </div>
+            </div>
+            <div class="mui-row">
+                <div class="mui-col-md-6 mui--text-subhead">
+                    <div style="padding-left: 1em;">${formattedTimeLeft}</div>
+                </div>
+                <div class="mui-col-md-6">
+                <a href="#" class="mui-btn mui-btn--primary" v-if="formattedTimeLeft !== 'Closed'">Bid</a>
+                </div>
+            </div>
+
+        </div>
+        </div>
+    </template>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script type="text/javascript">
+        var raceTile = Vue.extend({
+            delimiters: ['${','}'],
+            template: '#race-tile',
+            props: {
+                race: {
+                    type: Object,
+                    default: {}
+                }
+            },
+            data: function() {
+                return {
+                    now: 0
+                }
+            },
+            filters: {
+              translateType: function(value) {
+                  switch (value) {
+                      case 'harness':
+                          return 'HARNESS';
+                      case 'greyhound':
+                          return 'GREYHOUND';
+                      case 'horse':
+                          return 'THOROUGHBRED';
+                  }
+              }
+            },
+            mounted: function() {
+                var self = this;
+                setInterval(function() {
+                    self.$data.now = parseInt(Date.now());
+                }, 1000);
+            },
+            computed: {
+              formattedTimeLeft: function(race) {
+                  var self = this;
+
+                      var output = '';
+                      var diff = parseInt(race.race.race.timetogo)*1000 - self.$data.now;
+                      var duration = moment.duration(diff, 'milliseconds');
+
+                      if (diff <= 0) {
+                          $(document).trigger('refresh:races');
+                          return 'Closed';
+                      } else {
+                          if (duration.minutes() > 0) {
+                              output += ''+ duration.minutes() + 'm ';
+                          }
+                          output += ''+ duration.seconds() + 's'
+                      }
+                    return output;
+              }
+            },
+            methods: {
+                gotoRace: function(race) {
+                    window.location.href = '/race/'+race.race.id;
+                }
+            }
+        });
+
+        var next5Widget = Vue.extend({
+            delimiters: ['${','}'],
+            template: '#next5-widget',
+            data: function() {
+                return {
+                    races: [],
+                }
+            },
+            created: function() {
+                var self = this;
+                $.ajax({
+                    url: '/api/top5',
+                    method: 'GET'
+                }).then(function(objects) {
+                    self.races = objects;
+                });
+
+                $(document).on('refresh:races', function() {
+                    $.ajax({
+                        url: '/api/top5',
+                        method: 'GET'
+                    }).then(function(objects) {
+                        self.races = objects;
+                    });
+                });
+            }
+        });
+
+        Vue.component('race-tile', raceTile);
+        Vue.component('next5-widget', next5Widget);
+
+        new Vue({
+            el: '#app',
+            data: {
+                title: 'Next 5 Races'
+            },
+            delimiters: ['${','}']
+        });
+    </script>
+{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style type="text/css">
+        .race-tile {
+            cursor: pointer;
+        }
+        .component-fade-enter-active, .component-fade-leave-active {
+            transition: opacity .3s ease;
+        }
+        .component-fade-enter, .component-fade-leave-to
+            /* .component-fade-leave-active for <2.1.8 */ {
+            opacity: 0;
+        }
+
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity .5s
+        }
+        .fade-enter, .fade-leave-to /* .fade-leave-active in <2.1.8 */ {
+            opacity: 0
+        }
+        .mui-panel {
+            padding: 0;
+        }
+        .race-tile .mui-panel {
+            height: 150px;
+        }
+        .race-tile .mui-appbar {
+            padding: 0.5em;
+            min-height: 20px;
+        }
+        .race-tile .mui-appbar.horse {
+            background-color: #2196F3
+        ;
+        }
+        .race-tile .mui-appbar.greyhound {
+            background-color: #9E9E9E;
+        }
+        .race-tile .mui-appbar.harness {
+            background-color: #009688;
+        }
+    </style>
+{% endblock %}

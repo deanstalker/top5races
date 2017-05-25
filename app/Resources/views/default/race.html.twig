@@ -1,0 +1,139 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+    <section id="app" class="mui-container">
+        <div class="mui-appbar" v-bind:class="[ race ? race.meeting.type : '']">
+            <table width="100%">
+                <tr style="vertical-align:middle;">
+                    <td class="mui--appbar-height" style="padding: 0 1em">
+                        <div class="mui-row">
+                            <div class="mui-col-md-12 mui--text-subhead">
+                              ${race.meeting.type | translateType}
+                            </div>
+                        </div>
+                        <div class="mui-row">
+                            <div class="mui-col-md-12 mui--text-headline">
+                                ${race.raceNumber} - ${race.meeting.location}<br>
+                                ${formattedTimeLeft}
+                            </div>
+                        </div>
+                    </td>
+                    <td class="mui--appbar-height" align="right">
+                        <a href="#" class="mui-btn mui-btn--accent" v-if="isOpen">Bid</a>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="mui-container-fluid">
+            <div class="mui-row">
+                <div class="mui-panel">
+                    <table class="mui-table" v-if="race">
+                        <thead>
+                        <tr>
+                            <th v-if="race.meeting.type !== 'harness'">Barrier</th>
+                            <th>Saddle/Number</th>
+                            <th>Name</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="runner of runners">
+                                <td v-if="race.meeting.type !== 'harness'">${runner.barrierNumber}</td>
+                                <td>${runner.saddleNumber}</td>
+                                <td>${runner.name}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="mui-row">
+                        <a href="/" class="mui-btn mui-btn--flat">Back to Widget</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </section>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+
+    <script type="text/javascript">
+        new Vue({
+            delimiters: ['${','}'],
+            el: '#app',
+            data: {
+                title: 'Race',
+                race: {},
+                runners: [],
+                now: 0,
+                isOpen: true
+            },
+            filters: {
+                translateType: function(value) {
+                    switch (value) {
+                        case 'harness':
+                            return 'HARNESS';
+                        case 'greyhound':
+                            return 'GREYHOUND';
+                        case 'horse':
+                            return 'THOROUGHBRED';
+                    }
+                }
+            },
+            mounted: function() {
+                var self = this;
+                setInterval(function() {
+                    self.$data.now = parseInt(Date.now());
+                }, 1000);
+            },
+            created: function() {
+                var self = this;
+                $.ajax({
+                    url: '/api/race/{{ race.id }}',
+                    method: 'GET'
+                }).then(function(objects) {
+                    self.race = objects.race;
+                    self.runners = objects.runners;
+                })
+            },
+            computed: {
+                formattedTimeLeft: function(item) {
+                    var self = this;
+
+                    var output = '';
+                    var diff = parseInt(item.race.timetogo)*1000 - self.$data.now;
+                    var duration = moment.duration(diff, 'milliseconds');
+
+                    if (diff <= 0) {
+                        self.isOpen = false;
+                        return 'Closed';
+                    } else {
+                        if (duration.minutes() > 0) {
+                            output += ''+ duration.minutes() + 'm ';
+                        }
+                        output += ''+ duration.seconds() + 's'
+                    }
+                    return output;
+                }
+            }
+        });
+    </script>
+{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+
+    <style type="text/css">
+        .mui-appbar.horse {
+            background-color: #2196F3
+        ;
+        }
+        .mui-appbar.greyhound {
+            background-color: #9E9E9E;
+        }
+        .mui-appbar.harness {
+            background-color: #009688;
+        }
+    </style>
+{% endblock %}
+
